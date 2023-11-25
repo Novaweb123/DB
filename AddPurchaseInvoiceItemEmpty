@@ -1,0 +1,74 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`AddPurchaseInvoiceItemEmpty`(IN `p_sessiontoken` varchar(50))
+    NO SQL
+BEGIN
+
+DECLARE l_count int;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+DECLARE l_order int;
+DECLARE l_itemnumber int;
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+select count(*) into l_count from Purchase_invoice_header where Bill_number = "" and statusbit = 0;
+
+if l_count = 0 then
+
+
+INSERT INTO `Purchase_invoice_header` (`Bill_number`, `Order_number`, `Bill_date`, `Currency`, `Total_amount`, `Branch`, `Payment_terms`, `Due_date`, `Vendor_name`, `GST_treatment`, `GST_number`, `TDS_percentage`, `TDS_amount`, `CGST_amount`, `SGST_amount`, `Source_of_supply`, `Source_of_destination`,`Location`) VALUES ("", "", NULL, NULL, NULL, NULL,NULL, NULL,NULL, NULL,NULL,NULL,NULL,NULL, NULL,NULL, NULL,NULL); 
+
+SELECT LAST_INSERT_ID() into l_order;
+
+
+INSERT INTO `Purchase_invoice_line_items` (`idno`, `Item_name`, `MSKU`, `Account_type`, `Bill_number`, `Quantity`, `Price`, `Discount`, `GST_terms`, `Amount`, `Statusbit`) VALUES (NULL, NULL, NULL, NULL, l_order, NULL, NULL, NULL, NULL, NULL, 0);
+
+SELECT LAST_INSERT_ID() into l_itemnumber;
+
+else 
+
+
+select idno into l_count from Purchase_invoice_header where Bill_number = "" and statusbit = 0;
+DELETE FROM Purchase_invoice_line_items WHERE Bill_number = l_count;
+DELETE FROM Purchase_invoice_header WHERE Bill_number = '';
+
+/*select idno into l_itemnumber from Purchase_invoice_line_items where  statusbit = -1; */
+
+
+
+INSERT INTO `Purchase_invoice_header` (`Bill_number`, `Order_number`, `Bill_date`, `Currency`, `Total_amount`, `Branch`, `Payment_terms`, `Due_date`, `Vendor_name`, `GST_treatment`, `GST_number`, `TDS_percentage`, `TDS_amount`, `CGST_amount`, `SGST_amount`, `Source_of_supply`, `Source_of_destination`,`Location`) VALUES ("", "", NULL, NULL, NULL, NULL,NULL, NULL,NULL, NULL,NULL,NULL,NULL,NULL, NULL,NULL, NULL,NULL); 
+
+SELECT LAST_INSERT_ID() into l_order;
+
+
+INSERT INTO `Purchase_invoice_line_items` (`idno`, `Item_name`, `MSKU`, `Account_type`, `Bill_number`, `Quantity`, `Price`, `Discount`, `GST_terms`, `Amount`, `Statusbit`) VALUES (NULL, NULL, NULL, NULL, l_order, NULL, NULL, NULL, NULL, NULL, 0);
+
+SELECT LAST_INSERT_ID() into l_itemnumber;
+
+
+end if;
+
+
+
+select '200' as result,'Sucessfully Add Purchase Header' as msg,l_order as id,l_itemnumber as itemnumber;
+
+
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+End;
