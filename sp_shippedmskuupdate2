@@ -1,0 +1,40 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`sp_shippedmskuupdate2`(IN p_order_id INT, IN p_orderNumber VARCHAR(45), IN p_lineItemKey VARCHAR(45))
+BEGIN
+    DECLARE s_item_msku VARCHAR(100);
+    DECLARE s_package_size INT;  -- Declare s_package_size as an integer
+    DECLARE s_total_item_qty DECIMAL(10, 2);
+    DECLARE s_total_item_unitprice DECIMAL(10, 2);
+    DECLARE s_fulfill_from_id INT;
+    DECLARE s_item_sku VARCHAR(100);
+    DECLARE s_channel VARCHAR(45);
+    DECLARE s_quantity INT;-- Declare s_channel
+
+    -- Get the item details from Shipped_orders
+    -- Get the SKU and Channel from Shipped_orders
+    SELECT SKU, Channel, Quantity INTO s_item_sku, s_channel, s_quantity
+    FROM tbl_ship_for_profit
+    WHERE orderId = p_order_id AND orderNumber = p_orderNumber AND lineItemKey = p_lineItemKey;
+
+    -- Set MSKU and Package_size based on the channel and SKU
+    CASE s_channel
+        WHEN '517293' THEN
+            SELECT MSKU, Pack_size INTO s_item_msku, s_package_size FROM Amazon_pmc_item_master WHERE SKU = s_item_sku LIMIT 1;
+        WHEN '680912' THEN
+            SELECT MSKU, Pack_size INTO s_item_msku, s_package_size FROM Amazon_vsm_item_master WHERE SKU = s_item_sku LIMIT 1;
+        WHEN '680515' THEN
+            SELECT MSKU, Pack_size INTO s_item_msku, s_package_size FROM Walmart_item_master WHERE SKU = s_item_sku LIMIT 1;
+        WHEN '684165' THEN
+            SELECT MSKU, Pack_size INTO s_item_msku, s_package_size FROM Amazon_ca_item_master WHERE SKU = s_item_sku LIMIT 1;
+        WHEN '680521' THEN
+            SET s_item_msku = s_item_sku;
+            SET s_package_size = 1;
+        ELSE
+            SET s_item_msku = s_item_sku;
+            SET s_package_size = 1;
+    END CASE;
+
+    -- Update variables
+    UPDATE tbl_ship_for_profit
+    SET MSKU = s_item_msku, Package_size = s_package_size, Total_quantity = s_quantity * s_package_size
+    WHERE orderId = p_order_id AND orderNumber = p_orderNumber AND lineItemKey = p_lineItemKey;
+END;
