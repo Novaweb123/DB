@@ -1,0 +1,58 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`GetCurrency`(IN `p_sessiontoken` VARCHAR(30), IN `p_Sortby` VARCHAR(10), IN `p_Sortkey` VARCHAR(10), IN `p_page` VARCHAR(4), IN `p_PageSize` VARCHAR(4))
+    NO SQL
+BEGIN
+DECLARE l_count int;
+DECLARE l_dot datetime;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+DECLARE page int;
+DECLARE PageSize int;
+Declare v_offset int; 
+
+
+
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+
+set page=1; 
+set PageSize = 10;
+if p_page <> "" then 
+	set page = p_page;
+end if; 
+
+if p_PageSize <> "" then 
+	set PageSize = p_PageSize;
+end if; 
+set v_offset = (page - 1)* PageSize;
+
+
+select count(*) as count 
+from tbl_currency where statusbit = 1 ;
+  
+   
+	
+
+    select * from tbl_currency where statusbit = 1 order by CurrencyId desc LIMIT v_offset,PageSize;
+	
+
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+END;
