@@ -1,0 +1,27 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`getDropDown`()
+    NO SQL
+BEGIN
+
+select '200' as result,'ok' as msg;
+
+select * from tbl_location where statusbit = 1;
+
+select * from suppliers;
+
+select * from tbl_currency where statusbit = 1;
+
+/*
+select i.*,b.Brand as Brand_Name,p.Product_Category as Product_Category_Name,i.Discount_percentage as presentDiscount from Item_master_Sheet i JOIN  tbl_brands b on b.idno = i.Brand join tbl_product_category p on p.idno = i.Product_Category and p.category = i.Category;
+*/
+
+select idno,Brand from tbl_brands where statusbit = 1;
+
+select idno,Product_Category,Product_Category as label,idno as value from tbl_product_category where statusbit = 1;
+
+select idno,statecode from tbl_state_codes where statusbit = 1; 
+
+select idno,account_type from tbl_accounttypes where statusbit = 1;
+
+select id as value,Channel_name as label from Channel_Ids;
+
+END;
