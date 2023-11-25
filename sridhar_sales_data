@@ -1,0 +1,100 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`sridhar_sales_data`(IN p_orderdatestart DATE, IN p_orderdateend DATE, IN p_days INT)
+BEGIN
+    -- Declare variables
+    DECLARE done INT DEFAULT 0;
+    DECLARE s_msku VARCHAR(45);
+    
+    -- Declare variables for sales information
+    DECLARE s_total_sale INT;
+    DECLARE s_belmont_sale INT;
+    DECLARE s_richmond_sale INT;
+
+    -- Declare variables for stock information
+    DECLARE s_belmont_stock INT;
+    DECLARE s_richmond_stock INT;
+    DECLARE s_haridwar_stock INT;
+    DECLARE s_hyderabad_stock INT;
+
+    -- Declare variables for calculated values
+    DECLARE s_bel_req_stock DECIMAL(10, 2);
+    DECLARE s_rich_req_stock DECIMAL(10, 2);
+
+    -- Create a cursor to select distinct MSKUs based on the date range
+    DECLARE cur CURSOR FOR
+        SELECT DISTINCT s.MSKU
+        FROM Shipped_orders s
+        WHERE s.orderDate >= p_orderdatestart AND s.orderDate <= p_orderdateend;
+
+    -- Remove existing data from the Sales_data table
+    DELETE FROM Sales_data;
+
+    -- Open the cursor
+    OPEN cur;
+    
+    -- Start the loop to process each MSKU
+    read_loop: LOOP
+        FETCH cur INTO s_msku;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+
+        -- Initialize stock variables
+        SET s_belmont_stock = 0;
+        SET s_richmond_stock = 0;
+        SET s_haridwar_stock = 0;
+        SET s_hyderabad_stock = 0;
+
+        -- Calculate sales information for the current MSKU
+        SELECT
+            s.MSKU,
+            SUM(s.Total_Quantity) as Quantity_sold,
+            SUM(CASE WHEN tzsm.Zone = 'Belmont' THEN s.Total_Quantity ELSE 0 END) as Quantity_sold_Belmont,
+            SUM(CASE WHEN tzsm.Zone = 'Richmond' THEN s.Total_Quantity ELSE 0 END) as Quantity_sold_Richmond
+        INTO
+            s_msku, s_total_sale, s_belmont_sale, s_richmond_sale
+        FROM Shipped_orders s
+        LEFT JOIN tbl_zone_store_mapping tzsm ON tzsm.State_code = s.state
+        AND s.orderDate >= p_orderdatestart AND s.orderDate <= p_orderdateend
+        GROUP BY s.MSKU;
+
+        -- Search for stock information for the current MSKU in different locations
+        SELECT Quantity INTO s_belmont_stock FROM Inventory WHERE MSKU = s_msku AND Location = 19 limit 1;
+        SELECT Quantity INTO s_richmond_stock FROM Inventory WHERE MSKU = s_msku AND Location = 20 limit 1;
+        SELECT Quantity INTO s_haridwar_stock FROM Inventory WHERE MSKU = s_msku AND Location = 17 limit 1;
+        SELECT Quantity INTO s_hyderabad_stock FROM Inventory WHERE MSKU = s_msku AND Location = 1 limit 1;
+
+        -- Calculate required stock values
+        SET s_bel_req_stock = ((s_belmont_sale - s_belmont_stock) / p_days) * 30;
+        SET s_rich_req_stock = ((s_richmond_sale - s_richmond_stock) / p_days) * 30;
+
+        -- Insert data into the Sales_data table for the current MSKU
+        INSERT INTO Sales_data (
+            msku,
+            total_sale,
+            belmont_sale,
+            richmond_sale,
+            belmont_stock,
+            richmond_stock,
+            haridwar_stock,
+            hyderabad_stock,
+            bel_req_stock,
+            rich_req_stock
+        )
+        VALUES (
+            s_msku,
+            s_total_sale,
+            s_belmont_sale,
+            s_richmond_sale,
+            s_belmont_stock,
+            s_richmond_stock,
+            s_haridwar_stock,
+            s_hyderabad_stock,
+            s_bel_req_stock,
+            s_rich_req_stock
+        );
+
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE cur;
+END;
