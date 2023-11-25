@@ -1,0 +1,49 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`AddPurchaseInvoiceHeader`(IN `p_sessiontoken` varchar(50),in p_billnumber VARCHAR(50),in p_ordernumber VARCHAR(50),in p_billdate VARCHAR(50),in p_currency VARCHAR(5),in p_total_amount VARCHAR(10),in p_branch VARCHAR(10),in p_location VARCHAR(10),in p_payment_terms VARCHAR(10), in p_duedate VARCHAR(10),in p_vendor VARCHAR(100),in p_gst_treatment VARCHAR(100),in p_gst_number VARCHAR(50),in p_tds_percentage VARCHAR(10),in p_tds_amount VARCHAR(5),in p_cgst_amount VARCHAR(10),in p_sgst_amount VARCHAR(10),in p_source VARCHAR(45), in p_destination VARCHAR(45))
+    NO SQL
+BEGIN
+
+DECLARE l_count int;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+DECLARE l_order int;
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+
+
+select count(*) into l_order from Purchase_invoice_header where Bill_number = p_billnumber;
+
+if l_order = 0 then
+
+
+
+
+INSERT INTO `Purchase_invoice_header` (`Bill_number`, `Order_number`, `Bill_date`, `Currency`, `Total_amount`, `Branch`, `Payment_terms`, `Due_date`, `Vendor_name`, `GST_treatment`, `GST_number`, `TDS_percentage`, `TDS_amount`, `CGST_amount`, `SGST_amount`, `Source_of_supply`, `Source_of_destination`,`Location`,Createdby) VALUES (p_billnumber, p_ordernumber, p_billdate, p_currency, p_total_amount, p_branch, p_payment_terms, p_duedate,p_vendor, p_gst_treatment,p_gst_number,p_tds_percentage, p_tds_amount, p_cgst_amount, p_sgst_amount, p_source, p_destination,p_location,l_userid); 
+SELECT LAST_INSERT_ID() into l_order;
+
+select '200' as result,'Sucessfully Add Purchase Header' as msg,Bill_number as id;
+
+
+else 
+select '201' as result, 'Add Purchase Header Already Added' as msg;
+end if;
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+End;
