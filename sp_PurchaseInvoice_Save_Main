@@ -1,0 +1,148 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`sp_PurchaseInvoice_Save_Main`(IN `p_sessiontoken` VARCHAR(30), IN `id` int)
+    NO SQL
+BEGIN
+	DECLARE l_count 			int;
+	DECLARE l_dot 				datetime;
+	DECLARE l_userid 			int;
+	DECLARE l_usertypeid 		int;
+	DECLARE l_header_amount 	DECIMAL(10,2);
+	DECLARE l_child_amount 		DECIMAL(10,2);
+	DECLARE l_purline_item_id 	INT;
+	DECLARE l_purline_itemname 	VARCHAR(100);
+    DECLARE l_msku_val 			VARCHAR(255);
+	DECLARE l_purchase_qty 		INT;
+	DECLARE l_brand_id			INT;
+	DECLARE l_product_categry	INT;
+	DECLARE l_category_id		INT;
+	DECLARE l_item_unitprice	DECIMAL(10,2);
+	DECLARE l_item_netprice		DECIMAL(10,2);
+	DECLARE l_item_netamount	DECIMAL(10,2);
+	DECLARE finished 			INT DEFAULT FALSE;
+    DECLARE stock_count 		INT;
+	DECLARE l_location_id 		INT;
+	DECLARE l_po_billdate 		DATETIME;
+	DECLARE l_tran_id			INT;
+	DECLARE l_trantype_id		INT;
+	DECLARE l_order_number 		VARCHAR(100);
+	DECLARE l_batch_no			VARCHAR(100);
+	DECLARE l_manufered_date	DATETIME;
+	DECLARE l_expiry_date		DATETIME;
+	-- DECLARE l_location_id		INT(11);
+
+	/* -- l_purline_item_id, l_purline_itemname, l_purchase_qty, l_msku_val
+	SELECT im.Seller_SKU MSKU, pl.Item_name, pl.Quantity, brandid, im.product_category, im.Category, pl.net_price, 
+			Amount, pl.Batch, pl.Manuf, pl.Expiry, pl.Quantity
+	FROM Purchase_invoice_line_items pl INNER JOIN item_master im ON pl.itemid = im.idno
+	WHERE 1 = 1 
+	AND pl.Bill_number = id;
+	 */
+
+	DECLARE curPurLines CURSOR FOR
+		-- SELECT pili.itemid, pili.Item_name, pili.Quantity, im.Seller_SKU
+		SELECT pili.itemid, im.Seller_SKU, pili.Item_name, pili.Quantity, pili.brandid, im.product_category, im.Category, pili.net_price, 
+			pili.Amount, pili.Batch, pili.Manuf, pili.Expiry
+		FROM Purchase_invoice_line_items pili
+	    LEFT JOIN Item_master im ON im.idno = pili.itemid
+	    WHERE 1 = 1
+	    AND pili.Bill_number = id;
+
+	DECLARE CONTINUE HANDLER FOR NOT FOUND SET finished = TRUE;
+
+	SELECT count(*) into l_count FROM tbluserlog WHERE sessiontoken = p_sessiontoken and statusbit = 1;
+	
+	IF l_count <> 0 THEN
+		select userid, usertypeid into l_userid, l_usertypeid 
+		FROM tbluserlog 
+		WHERE sessiontoken = p_sessiontoken 
+		AND statusbit = 1;
+		-- select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;		
+	
+		SELECT sum(Total_amount), Branch, Bill_date, Order_number
+		INTO l_header_amount, l_location_id, l_po_billdate, l_order_number
+		FROM Purchase_invoice_header 
+		WHERE idno = id;
+	
+		SELECT trantype_id INTO l_trantype_id
+		FROM tbl_trantype_master ttm 
+		WHERE 1 = 1
+		AND trantype_name = 'PURCHASE_INWARD';
+		
+		INSERT INTO tbl_inventory_hdr (tran_date, trantype_id, remarks, created_by, created_on)
+		SELECT DATE(NOW()), l_trantype_id, concat('Purchase stock inward for PO--> ', id, ' date ', l_po_billdate), 1, now();
+		
+		SELECT LAST_INSERT_ID() INTO l_tran_id;
+	
+		UPDATE Purchase_invoice_line_items 
+		SET statusbit = 2 
+		WHERE 1 = 1
+		AND Bill_number = id 
+		AND statusbit = 0;
+		
+		DELETE FROM Purchase_invoice_line_items 
+		WHERE 1 = 1
+		AND Bill_number = id 
+		and Statusbit IN (-1, NULL);
+		
+		OPEN curPurLines;
+
+		purLinesLoop:
+		LOOP
+			-- pl.itemid, im.Seller_SKU, pl.Item_name, pl.Quantity, pl.brandid, im.product_category, im.Category, pl.net_price, pl.Amount, pl.Batch, 
+			-- pl.Manuf, pl.Expiry
+			FETCH curPurLines INTO l_purline_item_id, l_msku_val, l_purline_itemname, l_purchase_qty, l_brand_id, l_product_categry, 
+										l_category_id, l_item_netprice, l_item_netamount, l_batch_no, l_manufered_date, l_expiry_date;
+			
+			IF finished = TRUE THEN
+				LEAVE purLinesLoop;
+			END IF;
+				
+		    -- Check if the MSKU and Location combination exists in Current_Stock
+		    SELECT COUNT(*) INTO stock_count
+		    FROM Inventory
+		    WHERE 1 = 1
+		    AND MSKU = l_msku_val 
+		    AND Location = l_location_id;
+		
+		    IF stock_count > 0 THEN
+		        -- Update the existing quantity in Inventory
+		        UPDATE Inventory
+		        SET Quantity = Quantity + l_purchase_qty,
+		        	Available_Qty = Available_Qty + l_purchase_qty
+		        WHERE MSKU = l_msku_val 
+		        AND Location = l_location_id;
+		       
+				INSERT INTO tbl_inventory_det(tran_id, trantype_id, ref_tran_id, ref_tran_number, order_date, location_id, item_msku, item_name,
+							tran_qty, unit_price, tran_status, created_by, created_on)
+				VALUES(l_tran_id, l_trantype_id, id, l_order_number, l_po_billdate, l_location_id, l_msku_val, l_purline_itemname,
+							l_purchase_qty, l_item_netprice, 'PURCHASE_INWARD', 1, now());
+		       
+		    ELSE
+		    	
+				INSERT INTO Inventory (Date_modified, MSKU, Item_name, Quantity, `Location`, Brand, Product_Category, Category, MRP, 
+									Item_Amount, Batch, Manf_date, Expiry_date, Available_Qty, Blocked_Qty)
+				/*
+				SELECT now(), im.Seller_SKU MSKU, pl.Item_name, pl.Quantity, l_location_id, brandid, im.product_category, im.Category, pl.net_price, 
+						Amount, pl.Batch, pl.Manuf, pl.Expiry, pl.Quantity, 0
+				FROM Purchase_invoice_line_items pl INNER JOIN item_master im ON pl.itemid = im.idno
+				WHERE 1 = 1 
+				AND pl.Bill_number = id
+				AND pl.itemid = l_purline_item_id;
+				*/
+				VALUES(now(), l_msku_val, l_purline_itemname, l_purchase_qty, l_location_id, l_brand_id, l_product_categry, l_category_id, 
+						l_item_netprice, l_item_netamount, l_batch_no, l_manufered_date, l_expiry_date, l_purchase_qty, 0);
+					
+				INSERT INTO tbl_inventory_det(tran_id, trantype_id, ref_tran_id, ref_tran_number, order_date, location_id, item_msku, item_name,
+							tran_qty, unit_price, tran_status, created_by, created_on)
+				VALUES(l_tran_id, l_trantype_id, id, l_order_number, l_po_billdate, l_location_id, l_msku_val, l_purline_itemname,
+							l_purchase_qty, l_item_netprice, 'PURCHASE_INWARD', 1, now());
+		    END IF;
+				
+			END LOOP purLinesLoop;
+		
+			CLOSE curPurLines;
+			COMMIT;		
+
+	ELSE
+		SELECT '500' AS result, 'invalid session.' AS msg;
+	END IF;
+END;
