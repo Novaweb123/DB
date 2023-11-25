@@ -1,0 +1,38 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`GetVendorDiscount`(IN `p_sessiontoken` VARCHAR(30),in p_vendorid VARCHAR(50))
+    NO SQL
+BEGIN
+DECLARE l_count int;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+
+select '200' as result,'Sucessfully' as msg;
+
+
+select vendorid,product_category as Product_Category ,brand as Brand,discount_percentage as Discount_percentage from tbl_discount where vendorid = p_vendorid and statusbit = 1;
+
+
+
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+end;
