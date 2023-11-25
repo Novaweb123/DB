@@ -1,0 +1,84 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`sri_checking`(IN p_order_id INT, IN p_orderNumber VARCHAR(45), p_lineItemKey VARCHAR(45))
+BEGIN
+    DECLARE s_tran_id INT;          -- To store the transaction ID for inventory header
+    DECLARE s_trantype_id INT;      -- To store the transaction type ID for shipment
+    DECLARE s_item_msku VARCHAR(100);
+    DECLARE s_item_name VARCHAR(1000);
+    DECLARE s_total_item_qty DECIMAL(10, 2);
+    DECLARE s_total_item_unitprice DECIMAL(10, 2);
+    DECLARE s_fulfill_from_id INT;  -- To store the fulfillment center ID
+    DECLARE s_unshipped_exists INT; -- To check if the row exists in Unshipped_orders
+
+    -- Error handling
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1 @sqlstate = RETURNED_SQLSTATE, @errno = MYSQL_ERRNO, @text = MESSAGE_TEXT;
+        SET @full_error = CONCAT("ERROR ", @errno, " (", @sqlstate, "): ", @text);
+        SELECT @full_error;
+    END;
+
+    SET @err = 0;
+
+    -- Determine the trantype_id for shipment
+    SELECT trantype_id INTO s_trantype_id
+    FROM tbl_trantype_master
+    WHERE trantype_name = 'SALE_ISSUE';
+
+    -- Create a new inventory header record for the shipment
+    INSERT INTO tbl_inventory_hdr (tran_date, trantype_id, remarks, created_by, created_on)
+    VALUES (NOW(), s_trantype_id, CONCAT('Shipment for order ', p_orderNumber, ' lineItem', p_lineItemKey, ' at ', NOW()), 1, NOW());
+
+    SELECT LAST_INSERT_ID() INTO s_tran_id;
+
+    -- Get the item details from Shipped_orders
+    SELECT MSKU, name, Total_quantity, Unit_price, shipped_from
+    INTO s_item_msku, s_item_name, s_total_item_qty, s_total_item_unitprice, s_fulfill_from_id
+    FROM Shipped_orders
+    WHERE orderId = p_order_id and orderNumber = p_orderNumber and lineItemKey = p_lineItemKey;
+
+    -- Deduct the quantity from the inventory based on the shipped_from value
+    IF s_fulfill_from_id = 822908 THEN
+        -- Deduct from the Inventory where Location = 19
+        UPDATE Inventory
+        SET Blocked_Qty = Blocked_Qty - s_total_item_qty,
+            Quantity = Quantity - s_total_item_qty
+        WHERE MSKU = s_item_msku 
+        AND Location = 19;
+    ELSEIF s_fulfill_from_id = 1044294 THEN
+        -- Deduct from the Inventory where Location = 1
+        UPDATE Inventory
+        SET Blocked_Qty = Blocked_Qty - s_total_item_qty,
+            Quantity = Quantity - s_total_item_qty
+        WHERE MSKU = s_item_msku 
+        AND Location = 1;
+    ELSEIF s_fulfill_from_id = 471322 THEN
+        -- Deduct from the Inventory where Location = 20
+        UPDATE Inventory
+        SET Blocked_Qty = Blocked_Qty - s_total_item_qty,
+            Quantity = Quantity - s_total_item_qty
+        WHERE MSKU = s_item_msku 
+        AND Location = 20;
+    ELSEIF s_fulfill_from_id IN (1044314, 1044313) THEN
+        -- Deduct from the Inventory where Location = 17
+        UPDATE Inventory
+        SET Blocked_Qty = Blocked_Qty - s_total_item_qty,
+            Quantity = Quantity - s_total_item_qty
+        WHERE MSKU = s_item_msku 
+        AND Location = 17;
+    END IF;
+
+    -- Check if the row exists in Unshipped_orders
+    SELECT COUNT(*) INTO s_unshipped_exists
+    FROM Unshipped_orders
+    WHERE order_id = p_order_id and order_number = p_orderNumber and lineItemKey = p_lineItemKey;
+
+    -- If the row exists, delete it from Unshipped_orders
+    IF s_unshipped_exists > 0 THEN
+        DELETE FROM Unshipped_orders
+        WHERE order_id = p_order_id and order_number = p_orderNumber and lineItemKey = p_lineItemKey;
+    END IF;
+
+    -- Add a record to tbl_inventory_det for the shipment
+    INSERT INTO tbl_inventory_det (tran_id, trantype_id, ref_tran_id, ref_tran_number, order_date, location_id, item_msku, item_name, tran_qty, unit_price, tran_status, created_by, created_on)
+    VALUES (s_tran_id, s_trantype_id, p_order_id, NULL, NOW(), s_fulfill_from_id, s_item_msku, s_item_name, s_total_item_qty, s_total_item_unitprice, 'SHIPMENT', 1, NOW());
+END;
