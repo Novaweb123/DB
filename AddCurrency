@@ -1,0 +1,43 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`AddCurrency`(IN `p_sessiontoken` VARCHAR(30),in p_Currency VARCHAR(50),in p_Country VARCHAR(50))
+    NO SQL
+BEGIN
+DECLARE l_count int;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+DECLARE l_currency int;
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+
+
+select count(*) into l_currency from tbl_currency where Currency = p_Currency;
+
+if l_currency = 0 then
+
+select '200' as result,'Sucessfully Add Currency' as msg;
+
+INSERT INTO tbl_currency (Currency,Country) VALUES (p_Currency,p_Country); 
+
+else 
+select '201' as result, 'Currency Already Added' as msg;
+end if;
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+end;
