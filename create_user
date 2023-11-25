@@ -1,0 +1,83 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`create_user`(IN `p_mobile` VARCHAR(15), IN `p_email` VARCHAR(75), IN `p_uname` VARCHAR(75), IN `p_pword` VARCHAR(75), IN `p_usertypeid` INT, IN `p_name` VARCHAR(75))
+    NO SQL
+begin
+
+declare l_count int;
+
+declare l_dot datetime;
+
+declare l_userid int;
+
+declare l_flag int;
+
+declare l_sessiontoken varchar(30);
+
+DECLARE l_fullname VARCHAR(30);
+
+set l_dot = current_timestamp();
+
+select count(*) into l_count from tblusers where username = p_uname;
+
+
+
+if l_count = 0 then
+
+select count(*) into l_count from tblusers where email = p_email;
+
+
+
+
+
+insert into tblusers(doj,utypeid,username,password,mobile,email,name)
+values(l_dot,p_usertypeid,p_uname,p_pword,p_mobile,p_email,p_name);
+
+SELECT LAST_INSERT_ID() into l_userid;
+
+
+select count(*) into l_count from tbluserroles where userid = l_userid and usertypeid = p_usertypeid;
+
+if l_count = 0 THEN
+
+update tbluserroles set statusbit = 1 where userid = l_userid;
+
+insert into tbluserroles(dot,userid,usertypeid)values(l_dot,l_userid,p_usertypeid);
+
+end if;
+
+set l_flag = 0;
+
+while l_flag = 0 do
+
+set @p0='30'; 
+
+call `getrandomstr`(@p0, l_sessiontoken);
+
+select count(*) into l_count from tbluserlog where sessiontoken = l_sessiontoken;
+
+if l_count = 0 then
+
+set l_flag = 1;
+
+end if;
+
+end while;
+
+update tbluserlog set statusbit = 0 where userid = l_userid;
+
+insert into tbluserlog(dot,userid,sessiontoken,usertypeid)values
+
+(l_dot,l_userid,l_sessiontoken,p_usertypeid);
+
+select '200' as result, 'success' as msg;
+
+
+
+
+
+else 
+
+select '201' as result, 'the username is already registered' as msg;
+
+end if;
+
+END;
