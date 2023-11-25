@@ -1,0 +1,39 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`GetHeaderItem`(IN `p_sessiontoken` VARCHAR(30),in p_billnumber VARCHAR(50))
+    NO SQL
+BEGIN
+DECLARE l_count int;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+
+select '200' as result,'Sucessfully' as msg;
+
+/*
+select it.*,mi.Seller_SKU,mi.MRP_INR,b.Brand as BrandName,p.Product_Category  from Purchase_invoice_line_items it left join Item_master_Sheet mi on it.itemid = mi.idno left join tbl_brands b on b.idno = it.brandid  left join tbl_product_category p on p.idno = it.product_categoryid where it.Bill_number = p_billnumber;
+*/
+	select i.*,it.Seller_SKU as MSKU,b.Brand as BrandName,b.idno as Brand,a.account_type,p.Product_Category from Purchase_invoice_line_items i left join Item_master it on i.itemid = it.idno left join tbl_accounttypes a on a.idno = i.Account_type left join tbl_brands b on b.idno = i.brandid left join tbl_product_category p on p.idno = i.product_categoryid  where i.Bill_number = p_billnumber;  
+
+
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+end;
