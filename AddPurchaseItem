@@ -1,0 +1,67 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`AddPurchaseItem`(IN `p_sessiontoken` VARCHAR(30),in p_itemid int, in p_Item_name VARCHAR(100), in p_brandid int, in p_product_categoryid int, in p_Bill_number VARCHAR(100), in p_Account_type int, in p_Quantity int, in p_Price VARCHAR(100), in p_discount_pergentage VARCHAR(100), in p_Discount_amount VARCHAR(100),in p_net_price VARCHAR(100),in p_item_amount VARCHAR(100),in p_gst VARCHAR(100),in p_tax_amount VARCHAR(100),in p_Amount VARCHAR(100),in p_CGST VARCHAR(10),in p_SGST VARCHAR(10),in p_IGST VARCHAR(10),in p_idno int,in p_Manuf VARCHAR(100),in p_Expiry VARCHAR(100),in p_Batch VARCHAR(100))
+    NO SQL
+BEGIN
+DECLARE l_count int;
+DECLARE l_dot datetime;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+DECLARE l_sgst float;
+DECLARE l_cgst FLOAT;
+DECLARE l_igst FLOAT;
+DECLARE l_source_of_supply int;
+DECLARE l_source_of_designation int;
+
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+select '200' as result, 'Sucess' as msg;
+
+
+select Source_of_supply into l_source_of_supply from Purchase_invoice_header where idno = p_Bill_number;
+
+select Source_of_destination into l_source_of_designation from Purchase_invoice_header where idno = p_Bill_number;
+
+
+if l_source_of_designation != l_source_of_supply then 
+
+set l_sgst = 0;
+set l_cgst = 0;
+set l_igst = p_tax_amount;
+
+
+else 
+
+set l_sgst = p_tax_amount / 2;
+set l_cgst = p_tax_amount / 2;
+set l_igst = 0;
+
+end if;
+
+
+UPDATE Purchase_invoice_line_items SET itemid = p_itemid, Item_name = p_Item_name,brandid = p_brandid, product_categoryid = p_product_categoryid, Bill_number = p_Bill_number, Account_type = p_Account_type,Quantity = p_Quantity, Price = p_Price, discount_pergentage = p_discount_pergentage, Discount_amount = p_Discount_amount, net_price = p_net_price, item_amount = p_item_amount, gst = p_gst, tax_amount = p_tax_amount,Amount = p_Amount,CGST = l_cgst, SGST = l_sgst,IGST = l_igst,statusbit = 0,Manuf = p_Manuf,Expiry = p_Expiry,Batch = p_Batch WHERE Bill_number = p_Bill_number and idno = p_idno;
+
+
+select count(*) into l_count from Purchase_invoice_line_items where Bill_number = p_Bill_number and statusbit = -1;
+
+if l_count = 0 then
+
+INSERT INTO `Purchase_invoice_line_items` ( `Item_name`, `Account_type`, `Bill_number`, `Quantity`, `Price`, `GST_terms`, `Amount`,statusbit) VALUES ( NULL, NULL, p_Bill_number, NULL, NULL, NULL, NULL,-1);
+
+end if;
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+END;
