@@ -1,0 +1,87 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`sp_UpdateInventoryOnStockTransfer`(
+    IN p_Transfer_ID VARCHAR(45), IN p_MSKU VARCHAR(45)
+)
+BEGIN
+    DECLARE s_tran_id INT;          -- To store the transaction ID for inventory header
+    DECLARE s_trantype_id INT;      -- To store the transaction type ID for stock transfer
+    DECLARE s_MSKU VARCHAR(100);
+    DECLARE s_Item_name VARCHAR(1000);
+    DECLARE s_Received DECIMAL(10, 2);
+    DECLARE s_Unit_Price DECIMAL(10, 2);
+    DECLARE s_Shipped_From INT;
+    DECLARE s_Shipped_To INT;
+    DECLARE s_Date_shipped DATETIME;
+    DECLARE stock_count INT;  -- To store stock count
+    
+    -- Error handling
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1 @sqlstate = RETURNED_SQLSTATE, @errno = MYSQL_ERRNO, @text = MESSAGE_TEXT;
+        SET @full_error = CONCAT("ERROR ", @errno, " (", @sqlstate, "): ", @text);
+        SELECT @full_error;
+    END;
+
+    -- Determine the trantype_id for stock transfer
+    SELECT trantype_id INTO s_trantype_id
+    FROM tbl_trantype_master
+    WHERE trantype_name = 'STOCK_TRANSFER';
+     
+    -- Insert a record to get the transaction ID
+    INSERT INTO tbl_inventory_hdr (tran_date, trantype_id, remarks, created_by, created_on)
+    VALUES (NOW(), s_trantype_id, CONCAT('Stock Transfer for MSKU ', p_MSKU, ' at ', NOW()), 1, NOW());
+    
+    SELECT LAST_INSERT_ID() INTO s_tran_id;
+
+    -- Get details from Stock_transfer table
+    SELECT Date_shipped, Shipped_From, Shipped_To, MSKU, Item_name, Received, Unit_price
+    INTO s_Date_shipped, s_Shipped_From, s_Shipped_To, s_MSKU, s_Item_name, s_Received, s_Unit_Price
+    FROM Stock_transfer
+    WHERE Tracking_number = p_Transfer_ID and MSKU = p_MSKU;
+
+    -- Check stock count
+    SELECT COUNT(*) INTO stock_count
+    FROM Inventory
+    WHERE MSKU = s_MSKU AND Location = s_Shipped_To;
+   
+    IF stock_count > 0 THEN
+        -- Deduct the quantity from the inventory at Shipped_From location
+        UPDATE Inventory
+        SET Available_Qty = Available_Qty - s_Received,
+            Quantity = Quantity - s_Received
+        WHERE MSKU = s_MSKU AND Location = s_Shipped_From;
+
+        -- Add a record to tbl_inventory_det for the stock transfer from Shipped_From
+        INSERT INTO tbl_inventory_det (tran_id, trantype_id, ref_tran_id, ref_tran_number, order_date, location_id, item_msku, item_name, tran_qty, unit_price, tran_status, created_by, created_on)
+        VALUES (s_tran_id, s_trantype_id, p_Transfer_ID, p_Transfer_ID, s_Date_shipped, s_Shipped_From, s_MSKU, s_Item_name, -s_Received, s_Unit_Price, 'STOCK_TRANSFER', 1, NOW());
+
+        -- Add the received quantity to the inventory at Shipped_To location
+        UPDATE Inventory
+        SET Available_Qty = Available_Qty + s_Received,
+            Quantity = Quantity + s_Received
+        WHERE MSKU = s_MSKU AND Location = s_Shipped_To;
+
+        -- Add a record to tbl_inventory_det for the stock transfer to Shipped_To
+        INSERT INTO tbl_inventory_det (tran_id, trantype_id, ref_tran_id, ref_tran_number, order_date, location_id, item_msku, item_name, tran_qty, unit_price, tran_status, created_by, created_on)
+        VALUES (s_tran_id, s_trantype_id, p_Transfer_ID, p_Transfer_ID, s_Date_shipped, s_Shipped_To, s_MSKU, s_Item_name, s_Received, s_Unit_Price, 'STOCK_TRANSFER', 1, NOW());
+    ELSE
+        -- Deduct the quantity from the inventory at Shipped_From location
+        UPDATE Inventory
+        SET Available_Qty = Available_Qty - s_Received,
+            Quantity = Quantity - s_Received
+        WHERE MSKU = s_MSKU AND Location = s_Shipped_From;
+
+        -- Add a record to tbl_inventory_det for the stock transfer from Shipped_From
+        INSERT INTO tbl_inventory_det (tran_id, trantype_id, ref_tran_id, ref_tran_number, order_date, location_id, item_msku, item_name, tran_qty, unit_price, tran_status, created_by, created_on)
+        VALUES (s_tran_id, s_trantype_id, p_Transfer_ID, p_Transfer_ID, s_Date_shipped, s_Shipped_From, s_MSKU, s_Item_name, -s_Received, s_Unit_Price, 'STOCK_TRANSFER', 1, NOW());
+
+        -- Insert a new inventory record at Shipped_To location
+        INSERT INTO Inventory (Date_modified, MSKU, Item_name, Quantity, `Location`, Brand, Product_Category, Category, MRP, 
+            Item_Amount, Batch, Manf_date, Expiry_date, Available_Qty, Blocked_Qty)
+        VALUES (NOW(), s_MSKU, s_Item_name, s_Received, s_Shipped_To, NULL, NULL, NULL, 
+            NULL, NULL, NULL, NULL, NULL, s_Received, 0);
+        
+        -- Add a record to tbl_inventory_det for the stock transfer to Shipped_To
+        INSERT INTO tbl_inventory_det (tran_id, trantype_id, ref_tran_id, ref_tran_number, order_date, location_id, item_msku, item_name, tran_qty, unit_price, tran_status, created_by, created_on)
+        VALUES (s_tran_id, s_trantype_id, p_Transfer_ID, p_Transfer_ID, s_Date_shipped, s_Shipped_To, s_MSKU, s_Item_name, s_Received, s_Unit_Price, 'STOCK_TRANSFER', 1, NOW());
+    END IF;
+END;
