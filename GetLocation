@@ -1,0 +1,90 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`GetLocation`(IN `p_sessiontoken` VARCHAR(30), IN `p_location` VARCHAR(100), IN `p_address1` VARCHAR(100), IN `p_address2` VARCHAR(100), IN `p_state` VARCHAR(100), IN `p_country` VARCHAR(100), IN `p_Sortby` VARCHAR(10), IN `p_Sortkey` VARCHAR(10), IN `p_page` VARCHAR(4), IN `p_PageSize` VARCHAR(4))
+    NO SQL
+BEGIN
+DECLARE l_count int;
+DECLARE l_dot datetime;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+DECLARE page int;
+DECLARE PageSize int;
+Declare v_offset int; 
+
+
+
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+
+set page=1; 
+set PageSize = 10;
+if p_page <> "" then 
+	set page = p_page;
+end if; 
+
+if p_PageSize <> "" then 
+	set PageSize = p_PageSize;
+end if; 
+set v_offset = (page - 1)* PageSize;
+
+
+select count(*) as count 
+from tbl_location where 1=1
+  
+  
+    and case when p_location != "" then LocationName like CONCAT("%", p_location,"%") else 1=1 end
+    
+    and case when p_address1 != "" then Address1 like CONCAT("%", p_address1,"%")  else 1=1 end
+  	
+  	and case when p_address2 != "" then Address2 like CONCAT("%",  p_address2,"%") else 1=1 end 
+  	
+  	and case when p_state != "" then State like CONCAT("%",  p_state,"%") else 1=1 end 
+
+	and case when p_country != "" then Country like CONCAT("%",  p_country,"%") else 1=1 end;
+
+	
+
+    select * from tbl_location where 1=1
+  	
+    and case when p_location != "" then LocationName like CONCAT("%", p_location,"%") else 1=1 end
+    
+    and case when p_address1 != "" then Address1 like CONCAT("%", p_address1,"%")  else 1=1 end
+  	
+  	and case when p_address2 != "" then Address2 like CONCAT("%",  p_address2,"%") else 1=1 end 
+  	
+  	and case when p_state != "" then State like CONCAT("%",  p_state,"%") else 1=1 end 
+
+	and case when p_country != "" then Country like CONCAT("%",  p_country,"%") else 1=1 end
+  	 
+  	order by 
+	case when p_Sortkey = "p_location" and p_Sortby = "asc" then LocationName end asc,
+	case when p_Sortkey = "p_location" and p_Sortby = "desc" then LocationName end desc,
+	case when p_Sortkey = "p_address1" and p_Sortby = "asc" then Address1 end asc,
+	case when p_Sortkey = "p_address1" and p_Sortby = "desc" then Address1 end desc,
+	case when p_Sortkey = "p_address2" and p_Sortby = "asc" then Address2 end asc,
+	case when p_Sortkey = "p_address2" and p_Sortby = "desc" then Address2 end desc,
+	case when p_Sortkey = "p_state" and p_Sortby = "asc" then State end asc,
+	case when p_Sortkey = "p_state" and p_Sortby = "desc" then State end desc,
+	case when p_Sortkey = "p_country" and p_Sortby = "asc" then Country end asc,
+	case when p_Sortkey = "p_country" and p_Sortby = "desc" then Country end desc LIMIT v_offset,PageSize;
+	
+
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+END;
