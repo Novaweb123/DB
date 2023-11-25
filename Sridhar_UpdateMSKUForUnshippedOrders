@@ -1,0 +1,24 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`Sridhar_UpdateMSKUForUnshippedOrders`(IN p_SKU VARCHAR(50), IN p_Channel VARCHAR(45))
+BEGIN
+  DECLARE v_MSKU VARCHAR(50);
+
+  IF p_Channel = '517293' THEN
+    SELECT MSKU INTO v_MSKU FROM Amazon_pmc_item_master WHERE SKU = p_SKU;
+  ELSEIF p_Channel = '680912' THEN
+    SELECT MSKU INTO v_MSKU FROM Amazon_vsm_item_master WHERE SKU = p_SKU;
+  ELSEIF p_Channel = '680515' THEN
+    SELECT MSKU INTO v_MSKU FROM Walmart_item_master WHERE SKU = p_SKU;
+  ELSEIF p_Channel = '684165' THEN
+    SELECT MSKU INTO v_MSKU FROM Amazon_ca_item_master WHERE SKU = p_SKU;
+  ELSEIF p_Channel = '680521' THEN
+    SET v_MSKU = p_SKU;
+  ELSE
+    SET v_MSKU = NULL;
+  END IF;
+
+  -- Update the Unshipped_orders table with the calculated MSKU value
+  -- Assuming there's a column in Unshipped_orders called MSKU
+  UPDATE Unshipped_orders
+  SET MSKU = v_MSKU
+  WHERE SKU = p_SKU;
+END;
