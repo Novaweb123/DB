@@ -1,0 +1,29 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`nw_profitabilityrange`(
+    IN p_start_date DATE,
+    IN p_end_date DATE
+)
+BEGIN
+    -- Create a temporary table to store the results
+    CREATE TEMPORARY TABLE IF NOT EXISTS temp_results (
+        orderNumber VARCHAR(45),
+        SKU VARCHAR(45),
+        lineitemkey VARCHAR(45),
+        profitability DECIMAL(10, 2)
+    );
+
+    -- Iterate through orders in the specified date range
+    WHILE p_start_date <= p_end_date DO
+        INSERT INTO temp_results (orderNumber, SKU, lineitemkey, profitability)
+        SELECT orderNumber, SKU, lineitemkey, nw_profitability(orderNumber, SKU, lineitemkey)
+        FROM Shipped_orders
+        WHERE orderDate = p_start_date;
+
+        SET p_start_date = DATE_ADD(p_start_date, INTERVAL 1 DAY);
+    END WHILE;
+
+    -- Select and return the results from the temporary table
+    SELECT * FROM temp_results;
+
+    -- Drop the temporary table
+    DROP TEMPORARY TABLE IF EXISTS temp_results;
+END;
