@@ -1,0 +1,47 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`GetPurchaseBillDetails`(IN `p_sessiontoken` VARCHAR(30), IN `id` VARCHAR(100))
+    NO SQL
+BEGIN
+DECLARE l_count int;
+DECLARE l_dot datetime;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+
+
+
+
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+select '200' as result, 'Sucess' as msg;
+
+
+	select b.idno,b.Bill_number,b.Order_number,b.Bill_date,b.Total_amount,b.Payment_terms,b.Due_date,v.Supplier_Name as Vendor_name,b.GST_treatment,b.Source_of_destination,b.Source_of_supply,b.GST_number,c.Currency,(select `Location` from tbl_location where LocationId = b.`Location`) as Location,br.LocationName as Branch,br.LocationId as BranchId,(select statecode from tbl_state_codes where idno = b.Source_of_destination) as Source_of_destination_name,b.Vendor_name as vendor_id,c.CurrencyId,
+	(select statecode from tbl_state_codes where idno = b.Source_of_supply) as Source_of_supply_name
+	
+	 from Purchase_invoice_header b left join tbl_currency c on b.Currency = c.CurrencyId left join suppliers v on v.idno = b.Vendor_name
+	 left join tbl_location br on b.Branch = br.LocationId 
+	  where b.idno = id;  
+	
+	select i.*,it.Seller_SKU as MSKU,a.account_type from Purchase_invoice_line_items i join Item_master it on i.itemid = it.idno join tbl_accounttypes a on a.idno = i.Account_type
+	
+	where Bill_number = id;  
+
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+END;
