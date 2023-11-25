@@ -1,0 +1,11 @@
+
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`sp_Fulfillment_Reoprt`()
+BEGIN
+select tid.tran_id, tid.ref_tran_id AS order_id, tid.ref_tran_number AS order_number, tid.order_date, tid.item_msku, tid.item_name, tl.LocationName, tid.tran_qty, tid.unit_price, 
+		tid.tran_qty * tid.unit_price AS item_value
+from tbl_inventory_det tid, tbl_location tl
+-- , Unshipped_orders uo
+where 1 = 1
+and tid.tran_status = 'BLOCK_STOCK'
+and tid.location_id = tl.LocationId;
+END;
