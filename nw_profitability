@@ -1,0 +1,169 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`nw_profitability`(IN p_order_number VARCHAR(45), IN p_sku VARCHAR(45), IN p_lineitemkey VARCHAR(45))
+BEGIN
+    -- Declare variables
+    DECLARE s_order_date DATE;
+    DECLARE s_order_id VARCHAR(45);
+    DECLARE s_order_number VARCHAR(45);
+    DECLARE s_lineitem VARCHAR(45);
+    DECLARE s_sku VARCHAR(45);
+    DECLARE s_msku VARCHAR(45);
+    DECLARE s_item_name VARCHAR(100);
+    DECLARE s_quantity INT;
+    DECLARE s_pack_size INT;
+    DECLARE s_total_quantity INT;
+    DECLARE s_state VARCHAR(45);
+    DECLARE s_unit_cost FLOAT;
+    DECLARE s_shipment_amt_paid FLOAT;
+    DECLARE s_belmont_cost FLOAT;
+    DECLARE s_tracking_number VARCHAR(100);
+    DECLARE s_warehouse VARCHAR(45);
+    DECLARE s_order_total VARCHAR(45);
+    DECLARE s_amount_paid VARCHAR(45);
+    DECLARE s_shipmentcost FLOAT;
+    DECLARE s_item_count INT;
+    DECLARE s_brand VARCHAR(45);
+    DECLARE s_category VARCHAR(45);
+    DECLARE s_zone VARCHAR(45);
+    DECLARE n_shipamt_paid FLOAT;
+    DECLARE n_total_amnt_paid FLOAT;
+    DECLARE n_shipping_cost FLOAT;
+    DECLARE n_platform_fees FLOAT;
+    DECLARE n_total_cost FLOAT;
+    DECLARE n_profit_margin FLOAT;
+    DECLARE s_shipdate datetime;
+    DECLARE s_channel VARCHAR(45);
+    DECLARE s_location VARCHAR(45);
+
+    -- Error handling
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1 @sqlstate = RETURNED_SQLSTATE, @errno = MYSQL_ERRNO, @text = MESSAGE_TEXT;
+        SET @full_error = CONCAT("ERROR ", @errno, " (", @sqlstate, "): ", @text);
+        SELECT @full_error;
+    END;
+
+    -- Initialize variables
+    SET s_order_date = NULL;
+    SET s_order_id = NULL;
+    SET s_order_number = NULL;
+    SET s_lineitem = NULL;
+    SET s_sku = NULL;
+    SET s_msku = NULL;
+    SET s_item_name = NULL;
+    SET s_quantity = 0;
+    SET s_pack_size = 0;
+    SET s_total_quantity = 0;
+    SET s_state = NULL;
+    SET s_unit_cost = 0.0;
+    SET s_shipment_amt_paid = 0.0;
+    SET s_belmont_cost = 0.0;
+    SET s_tracking_number = NULL;
+    SET s_warehouse = NULL;
+    SET s_order_total = NULL;
+    SET s_amount_paid = NULL;
+    SET s_shipmentcost = 0.0;
+    SET s_brand = NULL;
+    SET s_category = NULL;
+    SET s_zone = NULL;
+    SET s_shipment_amt_paid = 0.0;
+
+    -- Fetch data
+    SELECT orderDate, orderId, orderNumber,lineItemKey, SKU, MSKU, name, Quantity, Package_size, Total_quantity, state, Unit_price, shippingAmount, shipDate, Channel
+    INTO s_order_date, s_order_id, s_order_number,s_lineitem, s_sku, s_msku, s_item_name, s_quantity, s_pack_size, s_total_quantity, s_state, s_unit_cost, s_shipment_amt_paid, s_shipdate, s_channel
+    FROM Shipped_orders
+    WHERE orderNumber = p_order_number AND SKU = p_sku AND lineItemKey = p_lineitemkey;
+
+    SELECT si.locationid INTO s_location FROM Shipped_orders s left join storeId si on s.shipped_from = si.Id
+    WHERE orderNumber = p_order_number AND SKU = p_sku AND lineItemKey = p_lineitemkey;
+
+
+    SELECT shipmentcost, trackingNumber
+    INTO s_shipmentcost, s_tracking_number
+    FROM Shipped_orders_header
+    WHERE OrderNumber = p_order_number;
+
+    SELECT Brand, Category, Cost_at_Belmont_in_USD
+    INTO s_brand, s_category, s_belmont_cost
+    FROM Item_master
+    WHERE Seller_SKU = s_msku
+    LIMIT 1;
+    
+    SELECT SUM(Total_quantity)
+    INTO s_item_count
+    FROM Shipped_orders
+    WHERE OrderNumber = p_order_number;
+    
+    SELECT ZONE INTO s_zone FROM tbl_zone_store_mapping
+    WHERE State_code = s_state;
+
+    -- Insert data into a temporary table
+    CREATE TEMPORARY TABLE IF NOT EXISTS temp_results (
+        orderDate DATE,
+        orderId VARCHAR(45),
+        orderNumber VARCHAR(45),
+        lineItemKey VARCHAR(45),
+        SKU VARCHAR(45),
+        name VARCHAR(100),
+        MSKU VARCHAR(45),
+        Quantity INT,
+        Package_size INT,
+        Total_quantity INT,
+        Unit_price FLOAT,
+        shippingAmount FLOAT,
+        Total_amnt_paid FLOAT, 
+        Shipmentcost FLOAT,
+        trackingNumber VARCHAR(100),
+        warehouseId VARCHAR(45),
+        amountPaid VARCHAR(45),
+        Cost_at_Belmont_in_USD FLOAT,
+        state VARCHAR(45),
+        Brand VARCHAR(45),
+        Category VARCHAR(45),
+        Region VARCHAR(45),
+        Platformfees DECIMAL(10, 2),
+        Total_cost DECIMAL(10, 2),
+        Profit_margin DECIMAL(10, 2),
+        Channel Varchar(45),
+        Shipdate DATETIME,
+        Warehouse Varchar(45)
+    );
+
+      SET n_shipamt_paid = (s_shipment_amt_paid/s_item_count)*s_total_quantity;
+      SET n_total_amnt_paid = (s_unit_cost*s_quantity) + n_shipamt_paid;
+      SET n_shipping_cost = (s_shipmentcost/s_item_count)*s_total_quantity;
+      SET n_platform_fees = s_unit_cost*0.15*s_quantity;
+      SET n_total_cost = (s_belmont_cost*s_total_quantity)+(n_shipping_cost+n_platform_fees);
+      SET n_profit_margin = n_total_amnt_paid - n_total_cost;
+
+    INSERT INTO Profitabilityreport (
+        orderDate, orderId, orderNumber, lineItemKey, SKU, name, MSKU, Quantity, Package_size,
+        Total_quantity, Unit_price, shippingAmount, Total_amnt_paid,
+        Shipmentcost, trackingNumber, warehouseId,
+        Cost_at_Belmont_in_USD, state, Brand, Category, Region, Platformfees, Total_cost, Profit_margin, Shipdate, Channel, Warehouse
+    )
+    VALUES (
+        s_order_date, s_order_id, s_order_number,s_lineitem, s_sku, s_item_name, s_msku, s_quantity, s_pack_size,
+        s_total_quantity, s_unit_cost , n_shipamt_paid, n_total_amnt_paid ,
+        n_shipping_cost ,s_tracking_number, s_warehouse, s_belmont_cost,
+        s_state, s_brand, s_category, s_zone, n_platform_fees,n_total_cost,n_profit_margin, s_shipdate, s_channel, s_location
+        
+    )
+    ON DUPLICATE KEY UPDATE
+        Unit_price = VALUES(Unit_price),
+        shippingAmount = VALUES(shippingAmount),
+        Total_amnt_paid = VALUES(Total_amnt_paid),
+        Shipmentcost = VALUES(Shipmentcost),
+        trackingNumber = VALUES(trackingNumber),
+        warehouseId = VALUES(warehouseId),
+        Cost_at_Belmont_in_USD = VALUES(Cost_at_Belmont_in_USD),
+        state = VALUES(state),
+        Brand = VALUES(Brand),
+        Category = VALUES(Category),
+        Region = VALUES(Region),
+        Platformfees = VALUES(Platformfees),
+        Total_cost = VALUES(Total_cost),
+        Profit_margin = VALUES(Profit_margin);
+
+    -- Delete temporary table
+    DROP TEMPORARY TABLE IF EXISTS temp_results;
+END;
