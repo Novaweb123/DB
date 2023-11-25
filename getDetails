@@ -1,0 +1,16 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`getDetails`(IN `p_record_type` VARCHAR(100), IN `p_id` INT, IN `p_extras` VARCHAR(100))
+    NO SQL
+BEGIN
+
+
+
+if p_record_type = "Userdetails" then
+	
+	select * from tblusers where idno = p_id;
+
+end if;
+
+
+
+
+end;
