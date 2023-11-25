@@ -1,0 +1,115 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`GetPurchaseInvoiceHeader`(IN `p_sessiontoken` VARCHAR(30), IN `p_billnumber` VARCHAR(30), IN `p_ordernumber` VARCHAR(10), IN `p_branch` VARCHAR(10), IN `p_location` VARCHAR(10), IN `p_fromdate` VARCHAR(10), IN `p_todate` VARCHAR(10), IN `p_Sortby` VARCHAR(10), IN `p_Sortkey` VARCHAR(10), IN `p_page` VARCHAR(4), IN `p_PageSize` VARCHAR(4))
+    NO SQL
+BEGIN
+DECLARE l_count int;
+DECLARE l_dot datetime;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+DECLARE page int;
+DECLARE PageSize int;
+Declare v_offset int; 
+
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+
+set page=1; 
+set PageSize = 10;
+if p_page <> "" then 
+	set page = p_page;
+end if; 
+
+if p_PageSize <> "" then 
+	set PageSize = p_PageSize;
+end if; 
+set v_offset = (page - 1)* PageSize;
+
+
+select count(*) as count 
+from Purchase_invoice_header where 1 = 1
+  
+  
+    and case when p_billnumber != "" then Bill_number = p_billnumber else 1=1 end
+    
+    and case when p_ordernumber != "" then Order_number = p_ordernumber  else 1=1 end
+  	
+  	and case when p_branch != "" then Branch =  p_branch else 1=1 end 
+  	
+  	and case when p_location != "" then Source_of_destination =  p_location else 1=1 end 
+
+and case WHEN p_fromdate <> ""  and p_todate <> "" then
+
+	 Bill_date BETWEEN p_fromdate and p_todate
+else 1 =1 
+
+end
+
+and case when p_fromdate <> ""  and p_todate = "" then
+
+	 Bill_date BETWEEN p_fromdate and CURRENT_DATE()
+	 
+	 else 1=1
+
+end;
+
+  /*select * from Purchase_invoice_header where  statusbit = 1*/
+  
+  select b.idno,b.Bill_number,b.Order_number,b.Bill_date,b.Total_amount,b.Payment_terms,b.Due_date,v.Supplier_Name as Vendor_name,b.GST_treatment,b.GST_number,c.Currency,l.LocationName as Branch,(select count(*) from Purchase_invoice_line_items where Bill_number = b.idno and statusbit != -1 ) as innerCount,b.Statusbit	
+	 from Purchase_invoice_header b left join tbl_currency c on b.Currency = c.CurrencyId left join suppliers v on v.idno = b.Vendor_name left join tbl_location l on b.Branch = l.LocationId where 1=1
+  
+    and case when p_billnumber != "" then b.Bill_number = p_billnumber else 1=1 end
+    
+    and case when p_ordernumber != "" then b.Order_number = p_ordernumber  else 1=1 end
+  	
+  	and case when p_branch != "" then b.Branch =  p_branch else 1=1 end 
+  	
+  	and case when p_location != "" then b.Source_of_destination =  p_location else 1=1 end 
+
+    and case WHEN p_fromdate <> ""  and p_todate <> "" then
+
+	 b.Bill_date BETWEEN p_fromdate and p_todate
+   
+    else 1 =1 
+
+    end
+
+    and case when p_fromdate <> ""  and p_todate = "" then
+
+	 b.Bill_date BETWEEN p_fromdate and CURRENT_DATE()
+	 
+	else 1=1
+
+end
+  	  
+  	order by b.idno desc LIMIT v_offset,PageSize;
+	
+	
+  	
+  	
+  	
+  	
+	
+
+
+
+
+
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+END;
