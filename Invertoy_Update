@@ -1,0 +1,7 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`Invertoy_Update`()
+    NO SQL
+BEGIN
+
+
+
+END;
