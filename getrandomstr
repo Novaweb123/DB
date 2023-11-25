@@ -1,0 +1,17 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`getrandomstr`(IN `p_len` INT, OUT `p_string` VARCHAR(50))
+    NO SQL
+begin
+
+DECLARE l_count int;
+
+set l_count = 1;
+
+while l_count = 1 do
+
+select left(md5(rand()),p_len) into p_string;
+select count(*) into l_count from tblusers where username = p_string;
+
+
+end WHILE;
+
+END;
