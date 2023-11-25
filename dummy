@@ -1,0 +1,24 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`dummy`()
+sp: BEGIN
+	-- this is a dummy procedure to store important and frequntly used queries
+	call sp_OrdersToFulfill ('2023-01-01', NOW(), 1);
+
+select sum(Blocked_Qty) from Inventory;
+
+select * from Inventory i where Quantity != Available_Qty;
+
+select * from Inventory i where MSKU = 38379;
+
+select * from Inventory where MSKU in  (44234, 46585);
+
+select * from tbl_inventory_det tid where item_msku in (44234, 46585);
+
+select * from tbl_inventory_hdr tih order by tran_id desc;
+
+select * from tbl_orders_to_fulfill_tmp totft where item_msku  in (44234, 46585);
+
+
+select * from Unshipped_orders where MSKU  in (38379);
+    
+	SELECT * FROM tbl_orders_to_fulfill_tmp totft;
+END;
