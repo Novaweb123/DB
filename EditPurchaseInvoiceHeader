@@ -1,0 +1,60 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`EditPurchaseInvoiceHeader`(IN `p_sessiontoken` varchar(50),in p_billnumber VARCHAR(50),in p_ordernumber VARCHAR(50),in p_billdate VARCHAR(50),in p_currency VARCHAR(5),in p_total_amount VARCHAR(10),in p_branch VARCHAR(10),in p_location VARCHAR(10),in p_payment_terms VARCHAR(10), in p_duedate VARCHAR(10),in p_vendor VARCHAR(100),in p_gst_treatment VARCHAR(100),in p_gst_number VARCHAR(50),in p_tds_percentage VARCHAR(10),in p_tds_amount VARCHAR(5),in p_cgst_amount VARCHAR(10),in p_sgst_amount VARCHAR(10),in p_source VARCHAR(45), in p_destination VARCHAR(45),in p_id int)
+    NO SQL
+BEGIN
+
+DECLARE l_count int;
+DECLARE l_userid int;
+DECLARE l_usertypeid int;
+DECLARE l_order int;
+DECLARE l_taxtype VARCHAR(10);
+
+select count(*) into l_count from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+if l_count <> 0 THEN
+select userid into l_userid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+select usertypeid into l_usertypeid from tbluserlog where sessiontoken = p_sessiontoken and statusbit = 1;
+
+
+if  l_usertypeid = 100 or l_usertypeid = 101 or l_usertypeid = 105  THEN
+
+
+
+
+/*
+select count(*) into l_order from Purchase_invoice_header where Bill_number = p_billnumber;
+
+if l_order = 0 then */
+
+
+UPDATE `stockandmanagement`.`Purchase_invoice_header` SET `Bill_number` = p_billnumber, `Order_number` = p_ordernumber, `Bill_date` = p_billdate, `Currency` = p_currency, `Total_amount` = p_total_amount, `Branch` = p_branch,`Payment_terms` = p_payment_terms, `Due_date` = p_duedate, `Vendor_name` = p_vendor, `GST_treatment` = p_gst_treatment, `GST_number` = p_gst_number, `TDS_percentage` = p_tds_percentage, `TDS_amount` = p_tds_amount, `CGST_amount` = p_cgst_amount, `SGST_amount` = p_sgst_amount, `Source_of_supply` = p_source, `Source_of_destination` = p_destination, `Statusbit` = 1 WHERE idno = p_id;
+
+
+if p_source = p_destination THEN
+
+set l_taxtype = "SGST";
+
+ELSE
+
+set l_taxtype = "IGST";
+
+end if;
+
+select '200' as result,'Sucessfully Add Purchase Header' as msg,l_taxtype as taxtype;
+
+select idno,tax_amount from Purchase_invoice_line_items where Bill_number = p_id and statusbit != -1;
+
+/*
+else 
+select '201' as result, 'Bill Number already Added' as msg;
+end if;
+*/
+ELSE
+select '201' as result, 'invalid request.' as msg;
+end if;
+
+
+ELSE
+select '500' as result, 'invalid session.' as msg;
+end if;
+
+End;
