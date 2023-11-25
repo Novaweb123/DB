@@ -1,0 +1,11 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `stockandmanagement`.`GetItemMasterDropDown`(in p_brandid int,in p_item VARCHAR(100))
+    NO SQL
+BEGIN
+
+select '200' as result,'ok' as msg;
+
+select i.idno as value,i.Item_name as label,i.GST_rate as gst,i.GST_rate as GST_Percentage,i.*,b.Brand as Brand_Name,p.Product_Category as Product_Category_Name,i.Discount_percentage as presentDiscount from Item_master i left JOIN  tbl_brands b on b.idno = i.Brand left join tbl_product_category p on p.idno = i.Product_Category and p.category = i.Category where i.Brand = p_brandid and i.Item_name like CONCAT('%',p_item,'%') order by i.Item_name limit 30;
+
+
+
+END;
