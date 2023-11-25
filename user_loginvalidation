@@ -1,0 +1,84 @@
+CREATE DEFINER=`dbuser`@`%` PROCEDURE `stockandmanagement`.`user_loginvalidation`(IN `p_uname` VARCHAR(75), IN `p_pword` VARCHAR(50))
+    NO SQL
+begin
+
+declare l_count int;
+
+declare l_dot datetime;
+
+declare l_usertypeid int;
+
+declare l_userid int;
+
+declare l_flag int;
+
+declare l_sessiontoken varchar(30);
+
+set l_dot = current_timestamp();
+
+select count(*) into l_count from tblusers where (username = p_uname) and binary PASSWORD = p_pword and statusbit = 1 limit 1;
+
+if l_count <> 0 then
+
+select idno into l_userid from tblusers where (username = p_uname ) limit 1;
+
+select count(*) into l_count from tbluserlog where userid = l_userid and statusbit = 1;
+
+if l_count = 0 then
+
+select usertypeid into l_usertypeid from tbluserroles where userid = l_userid and statusbit = 1 order by idno desc LIMIT 1;
+
+else 
+
+select usertypeid into l_usertypeid from tbluserlog where userid = l_userid order by idno desc limit 1;
+
+end if;
+
+
+
+set l_flag = 0;
+
+while l_flag = 0 do
+
+set @p0='30'; 
+
+call `getrandomstr`(@p0, l_sessiontoken);
+
+select count(*) into l_count from tbluserlog where sessiontoken = l_sessiontoken limit 1;
+
+if l_count = 0 then
+
+set l_flag = 1;
+
+end if;
+
+end while;
+
+
+update tbluserlog set statusbit = 0 where userid = l_userid;
+
+insert into tbluserlog(dot,userid,sessiontoken,usertypeid)values
+
+(l_dot,l_userid,l_sessiontoken,l_usertypeid);
+
+if l_usertypeid = 100 || l_usertypeid = 101 then 
+
+select '200' as result,'ok' as msg;
+
+select u.idno as userid,ur.usertypeid,u.username as fullname,u.email,u.pic,u.mobile,l_sessiontoken as sessiontoken from tblusers u join tbluserroles ur on u.idno = ur.userid where u.idno = l_userid;
+
+END if;
+ 
+
+
+
+
+
+
+else
+
+select '201' as result, 'Invalid Credentials' as msg;
+
+end if;
+
+END;
