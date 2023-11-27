@@ -144,7 +144,7 @@ BEGIN
     VALUES (
         s_order_date, s_order_id, s_order_number,s_lineitem, s_sku, s_item_name, s_msku, s_quantity, s_pack_size,
         s_total_quantity, s_unit_cost , n_shipamt_paid, n_total_amnt_paid ,
-        n_shipping_cost ,s_tracking_number, s_warehouse, s_belmont_cost,
+        n_shipping_cost ,s_tracking_number, s_warehouse, (s_belmont_cost*s_total_quantity),
         s_state, s_brand, s_category, s_zone, n_platform_fees,n_total_cost,n_profit_margin, s_shipdate, s_channel, s_location
         
     )
